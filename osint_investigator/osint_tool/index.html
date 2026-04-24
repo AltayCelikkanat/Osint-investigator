@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>OSINT Investigator</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #060a0f;
+  --surface: #0d1117;
+  --border: #1a2332;
+  --accent: #00d4ff;
+  --accent2: #00ff88;
+  --warn: #ff6b35;
+  --text: #e2e8f0;
+  --muted: #4a5568;
+  --card: #0f1923;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  overflow-x: hidden;
+  cursor: crosshair;
+}
+
+/* ── Scanline overlay ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,212,255,0.015) 2px,
+    rgba(0,212,255,0.015) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Grid background ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 48px;
+  background: rgba(6,10,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  z-index: 100;
+}
+
+.nav-logo {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1.1rem;
+  color: var(--accent);
+  letter-spacing: 2px;
+}
+
+.nav-logo span { color: var(--accent2); }
+
+nav ul {
+  display: flex; gap: 32px; list-style: none;
+}
+
+nav ul a {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 1px;
+  transition: color 0.2s;
+}
+
+nav ul a:hover { color: var(--accent); }
+
+.nav-cta {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.8rem;
+  padding: 8px 20px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-cta::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--accent);
+  transform: translateX(-100%);
+  transition: transform 0.2s;
+  z-index: -1;
+}
+
+.nav-cta:hover { color: var(--bg); }
+.nav-cta:hover::before { transform: translateX(0); }
+
+/* ── HERO ── */
+#hero {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  padding: 120px 24px 80px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-eyebrow {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 4px;
+  color: var(--accent2);
+  margin-bottom: 24px;
+  opacity: 0;
+  animation: fadeUp 0.6s 0.2s forwards;
+}
+
+.hero-title {
+  font-size: clamp(3rem, 9vw, 7rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -2px;
+  opacity: 0;
+  animation: fadeUp 0.6s 0.4s forwards;
+}
+
+.hero-title .line1 { display: block; color: var(--text); }
+.hero-title .line2 {
+  display: block;
+  -webkit-text-stroke: 1px var(--accent);
+  color: transparent;
+}
+
+.hero-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1rem;
+  color: var(--muted);
+  margin-top: 28px;
+  max-width: 560px;
+  line-height: 1.7;
+  opacity: 0;
+  animation: fadeUp 0.6s 0.6s forwards;
+}
+
+.hero-sub b { color: var(--accent); font-weight: normal; }
+
+.hero-btns {
+  display: flex; gap: 16px; margin-top: 48px; flex-wrap: wrap; justify-content: center;
+  opacity: 0;
+  animation: fadeUp 0.6s 0.8s forwards;
+}
+
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 14px 32px;
+  background: var(--accent);
+  color: var(--bg);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:hover {
+  background: var(--accent2);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0,212,255,0.3);
+}
+
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 14px 32px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── TERMINAL MOCKUP ── */
+.terminal-wrap {
+  margin-top: 72px;
+  width: 100%; max-width: 680px;
+  opacity: 0;
+  animation: fadeUp 0.6s 1s forwards;
+}
+
+.terminal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,212,255,0.05);
+}
+
+.terminal-bar {
+  background: #111820;
+  padding: 10px 16px;
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot.r { background: #ff5f57; }
+.dot.y { background: #febc2e; }
+.dot.g { background: #28c840; }
+
+.terminal-title {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-left: auto; margin-right: auto;
+  letter-spacing: 1px;
+}
+
+.terminal-body {
+  padding: 24px 24px 28px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.82rem;
+  line-height: 1.8;
+}
+
+.t-dim   { color: #2d3f52; }
+.t-cmd   { color: var(--accent2); }
+.t-out   { color: var(--text); }
+.t-ok    { color: var(--accent2); }
+.t-warn  { color: var(--warn); }
+.t-info  { color: var(--accent); }
+.t-cursor {
+  display: inline-block; width: 8px; height: 14px;
+  background: var(--accent);
+  animation: blink 1s step-end infinite;
+  vertical-align: middle;
+}
+
+/* ── FEATURES ── */
+#features {
+  padding: 120px 48px;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative; z-index: 1;
+}
+
+.section-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 4px;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  margin-bottom: 64px;
+}
+
+.section-title span { color: var(--accent); }
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+}
+
+.feature-card {
+  background: var(--card);
+  padding: 40px 36px;
+  transition: background 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0;
+  width: 2px; height: 0;
+  background: var(--accent);
+  transition: height 0.3s;
+}
+
+.feature-card:hover { background: #111a25; }
+.feature-card:hover::before { height: 100%; }
+
+.feature-icon {
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  display: block;
+}
+
+.feature-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  letter-spacing: -0.3px;
+}
+
+.feature-desc {
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.65;
+  font-family: 'Share Tech Mono', monospace;
+}
+
+/* ── INSTALL ── */
+#install {
+  padding: 120px 48px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  position: relative; z-index: 1;
+}
+
+.install-inner {
+  max-width: 880px; margin: 0 auto;
+}
+
+.install-methods {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+  margin-top: 48px;
+}
+
+.method-card {
+  border: 1px solid var(--border);
+  padding: 28px 28px 32px;
+  background: var(--bg);
+  position: relative;
+}
+
+.method-num {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+
+.method-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.code-block {
+  background: #060a0f;
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--accent2);
+  line-height: 1.7;
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.method-desc {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-top: 12px;
+}
+
+/* ── ROADMAP ── */
+#roadmap {
+  padding: 120px 48px;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative; z-index: 1;
+}
+
+.roadmap-list {
+  display: flex; flex-direction: column; gap: 0;
+  border: 1px solid var(--border);
+  margin-top: 48px;
+  overflow: hidden;
+}
+
+.roadmap-item {
+  display: flex; align-items: center; gap: 24px;
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+}
+
+.roadmap-item:last-child { border-bottom: none; }
+.roadmap-item:hover { background: var(--card); }
+
+.roadmap-status {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  flex-shrink: 0;
+  width: 90px;
+  text-align: center;
+}
+
+.status-done { background: rgba(0,255,136,0.1); color: var(--accent2); border: 1px solid rgba(0,255,136,0.2); }
+.status-soon { background: rgba(0,212,255,0.1); color: var(--accent); border: 1px solid rgba(0,212,255,0.2); }
+.status-planned { background: rgba(74,85,104,0.1); color: var(--muted); border: 1px solid var(--border); }
+
+.roadmap-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 40px 48px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 16px;
+  position: relative; z-index: 1;
+}
+
+.footer-logo {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--muted);
+  letter-spacing: 2px;
+}
+
+.footer-logo span { color: var(--accent); }
+
+.footer-links {
+  display: flex; gap: 24px; list-style: none;
+}
+
+.footer-links a {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 1px;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover { color: var(--accent); }
+
+.footer-copy {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  color: #2d3f52;
+  letter-spacing: 1px;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  nav { padding: 14px 20px; }
+  nav ul { display: none; }
+  #features, #install, #roadmap { padding: 80px 20px; }
+  .roadmap-item { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">OSINT<span>_</span>INVESTIGATOR</div>
+  <ul>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#install">Install</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+  </ul>
+  <a href="https://github.com/AltayCelikkanat/osint-investigator" class="nav-cta">GitHub →</a>
+</nav>
+
+<!-- ── HERO ── -->
+<section id="hero">
+  <p class="hero-eyebrow">// OPEN SOURCE INTELLIGENCE TOOL</p>
+
+  <h1 class="hero-title">
+    <span class="line1">OSINT</span>
+    <span class="line2">INVESTIGATOR</span>
+  </h1>
+
+  <p class="hero-sub">
+    Bir isim gir. <b>12 sosyal medya platformunu</b> tara, Google dorking yap,
+    konum verilerini çapraz karşılaştır — <b>saniyeler içinde rapor al.</b>
+  </p>
+
+  <div class="hero-btns">
+    <a href="https://github.com/AltayCelikkanat/osint-investigator/releases" class="btn-primary">
+      ⬇ İndir — Windows .exe
+    </a>
+    <a href="https://github.com/AltayCelikkanat/osint-investigator" class="btn-secondary">
+      ⭐ GitHub'da İncele
+    </a>
+  </div>
+
+  <div class="terminal-wrap">
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot r"></div>
+        <div class="dot y"></div>
+        <div class="dot g"></div>
+        <span class="terminal-title">OSINT_Investigator.exe</span>
+      </div>
+      <div class="terminal-body">
+        <div class="t-dim">══════════════════════════════════════════</div>
+        <div class="t-info">  🎯  OSINT ARAŞTIRMASI: JOHN DOE</div>
+        <div class="t-dim">══════════════════════════════════════════</div>
+        <br/>
+        <div class="t-info">📌 PHASE 1 — Google Arama</div>
+        <div class="t-out">  🔍 "John Doe" site:linkedin.com</div>
+        <div class="t-out">  🔍 "John Doe" email OR phone</div>
+        <div class="t-ok">  ✅ 12 Google sonucu toplandı.</div>
+        <br/>
+        <div class="t-info">📌 PHASE 2 — Sosyal Medya Taraması</div>
+        <div class="t-ok">  ✅ [LinkedIn]  → linkedin.com/in/johndoe</div>
+        <div class="t-ok">  ✅ [GitHub]    → github.com/johndoe</div>
+        <div class="t-ok">  ✅ [Twitter/X] → twitter.com/johndoe</div>
+        <div class="t-out">  ↳ Reddit: bulunamadı</div>
+        <br/>
+        <div class="t-info">📌 PHASE 3 — Konum Analizi</div>
+        <div class="t-ok">  ✅ Tutarlı — Muhtemelen aynı kişi</div>
+        <div class="t-out">  📍 Konum: New York, USA</div>
+        <br/>
+        <div class="t-ok">  📊 3 profil · 12 Google sonucu · Rapor kaydedildi.</div>
+        <span class="t-cursor"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FEATURES ── -->
+<section id="features">
+  <p class="section-label">// CAPABILITIES</p>
+  <h2 class="section-title">Neler <span>Yapabilir?</span></h2>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <span class="feature-icon">🌐</span>
+      <div class="feature-name">Google Dorking</div>
+      <div class="feature-desc">5 farklı gelişmiş dork sorgusu ile Google'dan hedef hakkında açık bilgileri otomatik toplar.</div>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">👤</span>
+      <div class="feature-name">12 Platform Taraması</div>
+      <div class="feature-desc">Twitter/X, Instagram, LinkedIn, GitHub, Reddit, TikTok, Pinterest, Facebook, YouTube, Twitch, Medium, Telegram.</div>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">🔤</span>
+      <div class="feature-name">Username Varyantları</div>
+      <div class="feature-desc">İsimden otomatik 12+ kullanıcı adı türevi üretir. johndoe, john.doe, j_doe, doejohn ve daha fazlası.</div>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">📍</span>
+      <div class="feature-name">Konum Tutarlılığı</div>
+      <div class="feature-desc">Farklı platformlardaki konum verilerini karşılaştırır. Amerika + Kanada gibi tutarsızlıkları uyarı olarak gösterir.</div>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">💾</span>
+      <div class="feature-name">Rapor Dışa Aktarma</div>
+      <div class="feature-desc">Tüm bulguları JSON ve TXT formatında kaydet. Zaman damgalı, yapılandırılmış çıktı.</div>
+    </div>
+    <div class="feature-card">
+      <span class="feature-icon">⚡</span>
+      <div class="feature-name">Canlı Log Arayüzü</div>
+      <div class="feature-desc">4 sekmeli Tkinter GUI. Canlı log, sosyal medya, Google ve konum sekmeleri. Tek tık .exe.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── INSTALL ── -->
+<section id="install">
+  <div class="install-inner">
+    <p class="section-label">// INSTALLATION</p>
+    <h2 class="section-title">Nasıl <span>Kurulur?</span></h2>
+
+    <div class="install-methods">
+      <div class="method-card">
+        <div class="method-num">01 / KOLAY</div>
+        <div class="method-title">Windows .exe</div>
+        <div class="method-desc">Releases sayfasından .exe indir, çalıştır. Python gerekmez.</div>
+        <a href="https://github.com/AltayCelikkanat/osint-investigator/releases" class="btn-primary" style="margin-top:20px;display:inline-flex;font-size:0.8rem;padding:10px 20px;">⬇ Releases →</a>
+      </div>
+
+      <div class="method-card">
+        <div class="method-num">02 / GELİŞTİRİCİ</div>
+        <div class="method-title">Python ile Çalıştır</div>
+        <div class="code-block">git clone https://github.com/<br/>AltayCelikkanat/osint-investigator<br/>cd osint-investigator<br/>pip install -r requirements.txt<br/>python osint_gui.py</div>
+      </div>
+
+      <div class="method-card">
+        <div class="method-num">03 / WINDOWS</div>
+        <div class="method-title">Otomatik Başlatıcı</div>
+        <div class="method-desc">OSINT_BASLAT.bat dosyasına çift tıkla. Python yoksa otomatik kurar, ardından programı başlatır.</div>
+        <div class="code-block">OSINT_BASLAT.bat<br/># çift tıkla — bitti.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── ROADMAP ── -->
+<section id="roadmap">
+  <p class="section-label">// ROADMAP</p>
+  <h2 class="section-title">Geliştirme <span>Planı</span></h2>
+
+  <div class="roadmap-list">
+    <div class="roadmap-item">
+      <span class="roadmap-status status-done">✓ TAMAM</span>
+      <span class="roadmap-text">Google Dorking — 5 farklı sorgu</span>
+    </div>
+    <div class="roadmap-item">
+      <span class="roadmap-status status-done">✓ TAMAM</span>
+      <span class="roadmap-text">12 Platform Sosyal Medya Taraması</span>
+    </div>
+    <div class="roadmap-item">
+      <span class="roadmap-status status-done">✓ TAMAM</span>
+      <span class="roadmap-text">Konum Tutarlılık Analizi</span>
+    </div>
+    <div class="roadmap-item">
+      <span class="roadmap-status status-done">✓ TAMAM</span>
+      <span class="roadmap-text">JSON + TXT Rapor Dışa Aktarma</span>
+    </div>
+    <div class="roadmap-item">
+      <span class="roadmap-status status-done">✓ TAMAM</span>
+      <span class="roadmap-text">Windows .exe Build (PyInstaller)</span>
+    </div>
+    <div class="roadmap-item">
+      <span class="roadmap-status status-soon">→ YAKINDA</span>
+      <span class="roadmap-text">HaveIBeenPwned E-posta Sorgulama</span>
+    </div>
+    <div class="roadmap-item">
+      <span class="roadmap-status status-soon">→ YAKINDA</span>
+      <span class="roadmap-text">Whois Domain Sorgusu</span>
+    </div>
+    <div class="roadmap-item">
+      <span class="roadmap-status status-planned">PLANLANDI</span>
+      <span class="roadmap-text">Shodan IP Entegrasyonu</span>
+    </div>
+    <div class="roadmap-item">
+      <span class="roadmap-status status-planned">PLANLANDI</span>
+      <span class="roadmap-text">Proxy / VPN Desteği</span>
+    </div>
+    <div class="roadmap-item">
+      <span class="roadmap-status status-planned">PLANLANDI</span>
+      <span class="roadmap-text">PDF Rapor Export</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <div class="footer-logo">OSINT<span>_</span>INVESTIGATOR</div>
+  <ul class="footer-links">
+    <li><a href="https://github.com/AltayCelikkanat/osint-investigator">GitHub</a></li>
+    <li><a href="https://github.com/AltayCelikkanat/osint-investigator/releases">Releases</a></li>
+    <li><a href="https://github.com/AltayCelikkanat/osint-investigator/issues">Issues</a></li>
+  </ul>
+  <p class="footer-copy">MIT LICENSE · FOR ETHICAL USE ONLY</p>
+</footer>
+
+</body>
+</html>
